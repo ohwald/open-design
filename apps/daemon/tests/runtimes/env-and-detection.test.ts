@@ -5,7 +5,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as platform from '@open-design/platform';
 import {
-  assert, chmodSync, detectAgents, inspectAgentExecutableResolution, join, minimalAgentDef, mkdirSync, mkdtempSync, opencode, resolveAgentExecutable, rmSync, spawnEnvForAgent, tmpdir, withEnvSnapshot, withPlatform, writeFileSync,
+  assert, chmodSync, detectAgents, inspectAgentExecutableResolution, join, kimi, minimalAgentDef, mkdirSync, mkdtempSync, opencode, resolveAgentExecutable, rmSync, spawnEnvForAgent, tmpdir, withEnvSnapshot, withPlatform, writeFileSync,
 } from './helpers/test-helpers.js';
 import { isCursorAuthFailureText } from '../../src/runtimes/auth.js';
 import { getRememberedLiveModels } from '../../src/runtimes/models.js';
@@ -446,6 +446,27 @@ test('resolveAgentExecutable supports configured binary overrides for non-Codex 
   }
 });
 
+test('resolveAgentExecutable resolves kimi via kimi-code fallback bin when kimi is not on PATH', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'od-kimi-code-fallback-'));
+  try {
+    return withEnvSnapshot(['PATH', 'OD_AGENT_HOME'], () => {
+      const fallback = join(dir, 'kimi-code');
+      writeFileSync(fallback, '#!/bin/sh\necho "kimi-code 1.0.0"\n');
+      chmodSync(fallback, 0o755);
+      process.env.PATH = dir;
+      process.env.OD_AGENT_HOME = dir;
+
+      const resolution = inspectAgentExecutableResolution(kimi);
+
+      assert.equal(resolution.configuredOverridePath, null);
+      assert.equal(resolution.pathResolvedPath, fallback);
+      assert.equal(resolution.selectedPath, fallback);
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('resolveAgentExecutable prefers opencode-cli before desktop opencode fallback', () => {
   const dir = mkdtempSync(join(tmpdir(), 'od-opencode-cli-'));
   try {
@@ -540,9 +561,9 @@ fsTest('detectAgents keeps Kimi available when the installed CLI rejects the leg
       assert.equal(kimi.available, true);
       assert.equal(kimi.version, 'kimi 0.6.0');
       assert.equal(kimi.models[0]?.id, 'default');
-      assert.equal(kimi.models[1]?.id, 'kimi-k2-turbo-preview');
-      assert.equal(kimi.models[2]?.id, 'moonshot-v1-8k');
-      assert.equal(kimi.models[3]?.id, 'moonshot-v1-32k');
+      assert.equal(kimi.models[1]?.id, 'kimi-k2.5');
+      assert.equal(kimi.models[2]?.id, 'kimi-k2.6');
+      assert.equal(kimi.models[3]?.id, 'kimi-k2-thinking');
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
